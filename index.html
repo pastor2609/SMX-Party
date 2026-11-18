@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMX Party</title>
+  <link rel="stylesheet" href="css/estilos.css">
+
+  <!-- Three.js (3D) se carga desde CDN. El "importmap" le dice al navegador
+       dónde está "three" cuando un archivo hace: import * as THREE from 'three' -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <!-- PeerJS (multijugador peer-to-peer) desde CDN. Queda en window.Peer -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+  <!-- ============================ INICIO ============================ -->
+  <section id="pantalla-inicio" class="pantalla activa">
+    <div class="tarjeta tarjeta-inicio">
+      <h1 class="logo">SMX <span>Party</span></h1>
+      <p class="subtitulo">¡El party game de 1º de SMX!</p>
+
+      <label for="input-nombre">Tu nombre</label>
+      <input id="input-nombre" type="text" maxlength="16" placeholder="Escribe tu nombre" autocomplete="off">
+
+      <button id="btn-crear" class="boton boton-grande">🏠 Crear sala</button>
+
+      <div class="separador"><span>o</span></div>
+
+      <label for="input-codigo">Código de la sala</label>
+      <div class="fila">
+        <input id="input-codigo" type="text" maxlength="8" placeholder="Ej: K7QM2" autocomplete="off">
+        <button id="btn-unirse" class="boton">Unirse</button>
+      </div>
+
+      <p id="inicio-error" class="error"></p>
+      <p id="inicio-red" class="nota"></p>
+    </div>
+  </section>
+
+  <!-- ======================== SALA DE ESPERA ======================== -->
+  <section id="pantalla-sala" class="pantalla">
+    <div class="sala-columnas">
+      <div class="tarjeta">
+        <h2>Sala de espera</h2>
+        <div class="codigo-caja">
+          <span>Código:</span>
+          <strong id="sala-codigo">-----</strong>
+          <button id="btn-copiar" class="boton boton-pequeno">📋 Copiar</button>
+        </div>
+        <p class="nota">Pasa este código a tus amigos para que se unan.</p>
+
+        <h3>Jugadores <span id="sala-contador"></span></h3>
+        <ul id="sala-jugadores" class="lista-jugadores"></ul>
+
+        <h3>Opciones</h3>
+        <div class="opciones">
+          <label>Rondas
+            <select id="sel-rondas"></select>
+          </label>
+          <label>Máx. jugadores
+            <select id="sel-max"></select>
+          </label>
+        </div>
+        <p id="sala-espera-host" class="nota">Esperando a que el host empiece la partida…</p>
+
+        <div class="fila">
+          <button id="btn-salir-sala" class="boton boton-gris">Salir</button>
+          <button id="btn-empezar" class="boton boton-grande">🚀 Empezar</button>
+        </div>
+      </div>
+      <div id="hueco-chat-sala" class="hueco-chat"></div>
+    </div>
+  </section>
+
+  <!-- ============================ PARTIDA ============================ -->
+  <section id="pantalla-juego" class="pantalla">
+    <div id="escena"></div>
+
+    <!-- Barra superior -->
+    <div id="hud-arriba" class="hud">
+      <span id="hud-ronda">Ronda 1 / 10</span>
+      <span id="hud-turno"></span>
+    </div>
+
+    <!-- Marcador -->
+    <div id="hud-marcador" class="hud">
+      <h3>Marcador</h3>
+      <ul id="marcador-lista"></ul>
+    </div>
+
+    <!-- Panel central de acciones (dado, saltar...) -->
+    <div id="hud-centro" class="hud oculto">
+      <div id="dado" class="dado oculto">?</div>
+      <p id="hud-mensaje"></p>
+      <p id="hud-cuenta" class="cuenta"></p>
+      <div class="fila centrada">
+        <button id="btn-tirar" class="boton boton-grande oculto">🎲 Tirar dado <kbd>Espacio</kbd></button>
+        <button id="btn-saltar" class="boton boton-gris oculto">⏩ Saltar animación <kbd>Espacio</kbd></button>
+      </div>
+    </div>
+
+    <!-- Preguntas: bifurcación, tienda -->
+    <div id="hud-decision" class="hud oculto">
+      <p id="decision-texto"></p>
+      <div id="decision-opciones"></div>
+      <p id="decision-cuenta" class="cuenta"></p>
+    </div>
+
+    <!-- Chat dentro de la partida -->
+    <div id="hueco-chat-juego" class="hueco-chat hueco-chat-juego"></div>
+
+    <!-- Minijuego provisional -->
+    <div id="capa-minijuego" class="capa oculto">
+      <div class="tarjeta">
+        <h2>🎮 Aquí irá un minijuego</h2>
+        <p class="nota">(Hueco para la fase 2. De momento se reparten monedas al azar.)</p>
+        <ul id="minijuego-premios" class="lista-jugadores"></ul>
+        <p id="minijuego-cuenta" class="cuenta"></p>
+        <button id="btn-continuar" class="boton boton-grande oculto">Continuar ▶</button>
+      </div>
+    </div>
+
+    <!-- Resultados -->
+    <div id="capa-resultados" class="capa oculto">
+      <div class="tarjeta">
+        <h2>🏆 Resultados</h2>
+        <p id="resultados-ganador" class="ganador"></p>
+        <p id="resultados-motivo" class="nota"></p>
+        <ol id="resultados-lista" class="lista-jugadores"></ol>
+        <div class="fila centrada">
+          <button id="btn-volver-sala" class="boton oculto">🏠 Volver a la sala</button>
+          <button id="btn-salir-final" class="boton boton-gris">Salir al inicio</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== CHAT (se mueve entre la sala y la partida) ============== -->
+  <div id="chat" class="chat">
+    <div class="chat-cabecera">💬 Chat</div>
+    <div id="chat-mensajes" class="chat-mensajes"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" type="text" maxlength="200" placeholder="Escribe un mensaje…" autocomplete="off">
+      <button class="boton boton-pequeno" type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <!-- Avisos flotantes (se ven en cualquier pantalla) -->
+  <div id="avisos"></div>
+
+  <!-- ===================== VENTANA DE AVISO IMPORTANTE ===================== -->
+  <div id="modal" class="capa capa-modal oculto">
+    <div class="tarjeta">
+      <h2 id="modal-titulo"></h2>
+      <p id="modal-texto"></p>
+      <button id="modal-boton" class="boton boton-grande">Aceptar</button>
+    </div>
+  </div>
+
+  <!-- Punto de entrada del juego -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

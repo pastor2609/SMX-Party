@@ -20,14 +20,19 @@ export const CONFIG = {
   MONEDAS_ROJA: 3,
   PRECIO_ESTRELLA: 20,
   PRECIO_DADO_DOBLE: 8,
-  MINIJUEGO_PREMIO_MIN: 1,     // monedas al azar del minijuego provisional
-  MINIJUEGO_PREMIO_MAX: 10,
+
+  // Minijuegos: monedas según el puesto (1.º, 2.º, 3.º...)
+  MONEDAS_POR_PUESTO: [10, 6, 3],
+  MONEDAS_RESTO_PUESTOS: 1,    // del 4.º puesto en adelante
 
   // Tiempos (milisegundos)
   TIEMPO_TIRAR_DADO: 20000,    // si no tira en este tiempo, se tira solo
   TIEMPO_BIFURCACION: 10000,   // tiempo para elegir camino
   TIEMPO_TIENDA: 10000,        // tiempo para decidir en la tienda
-  TIEMPO_MINIJUEGO: 10000,     // la pantalla provisional se cierra sola
+  MINIJUEGO_INSTRUCCIONES: 5000, // pantalla de instrucciones
+  MINIJUEGO_CUENTA_ATRAS: 3000,  // 3, 2, 1...
+  MINIJUEGO_RESULTADOS: 10000,   // la pantalla de resultados se cierra sola
+  TIEMPO_REAL_HZ: 20,            // veces por segundo que el host envía el estado
   DURACION_DADO: 1200,         // animación del dado
   DURACION_PASO: 420,          // tiempo entre casilla y casilla
   DURACION_EFECTO: 1400,       // pausa para leer el efecto de la casilla

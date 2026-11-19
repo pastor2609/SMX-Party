@@ -5,7 +5,7 @@ Party game estilo Mario Party con el lore de 1r SMX.
 Se juega en el navegador del ordenador, online, de 2 a 8 jugadores. Uno crea la sala y los demás se unen con un código.
 El diseño completo del juego está en [`docs/DISENO.md`](docs/DISENO.md).
 
-**Estado actual: Fase 1** → base jugable online, sin arte (tablero 3D sencillo, turnos, casillas, estrella, minijuego provisional y resultados).
+**Estado actual: Fase 2, parte 1** → partida online completa en el tablero + sistema de minijuegos con el primero de ellos: **"Fuera de la plataforma"** (tiempo real: empuja a los demás al agua).
 
 ---
 
@@ -37,7 +37,7 @@ Cada vez que unas cambios a `main`, la web se actualiza sola en un par de minuto
 5. Vuelve a la pestaña 1: verás a los dos jugadores. Elige el número de rondas (5 es lo más rápido para probar) y pulsa **Empezar**.
 6. Ve cambiando de pestaña para jugar con cada jugador.
 
-**Controles**
+**Controles en el tablero**
 
 | Tecla / ratón | Qué hace |
 |---|---|
@@ -45,12 +45,37 @@ Cada vez que unas cambios a `main`, la web se actualiza sola en un par de minuto
 | `1`, `2`… (o los botones) | Elegir camino en una bifurcación / responder en la tienda |
 | `Enter` | Escribir en el chat |
 
+**Controles en el minijuego "Fuera de la plataforma"**
+
+| Tecla | Qué hace |
+|---|---|
+| `W` `A` `S` `D` o flechas | Moverse |
+| `Espacio` | Empujón (embestida hacia donde miras; se recarga en 1,5 s, mira la barra de abajo) |
+
+> 💡 **Truco para probar con dos pestañas**: los navegadores "duermen" las pestañas que no se ven. Para los minijuegos en tiempo real es mejor abrir **dos ventanas** (no pestañas) y ponerlas **una al lado de la otra**, así las dos se ven a la vez. Haz clic en la ventana del jugador que quieras mover: las teclas solo van a la ventana activa.
+
 **Cosas que conviene saber al probar**
 
 - Necesitas **conexión a internet**: el juego descarga Three.js y PeerJS, y usa un servidor gratuito de PeerJS para que los navegadores se encuentren.
 - Si la otra pestaña está en segundo plano mucho rato, el navegador la "duerme" un poco. Es normal que vaya algo más lenta.
 - Si no tiras el dado en 20 segundos, se tira solo. En las bifurcaciones tienes 10 segundos para elegir.
 - Para probar una desconexión: cierra la pestaña de un jugador (la partida sigue sin él). Si cierras la pestaña del host, a los demás les sale un aviso.
+
+### 🎮 Probar el minijuego directamente (sin jugar rondas)
+
+Añade `?minijuego=plataforma` a la dirección de quien **crea** la sala:
+
+```
+https://pastor2609.github.io/SMX-Party/?minijuego=plataforma
+```
+
+1. Crea la sala con esa dirección. En la sala de espera aparece un botón gris **"🧪 Probar minijuego: Fuera de la plataforma"**.
+2. Si quieres, une más jugadores desde otras ventanas (con la dirección normal y el código).
+3. Pulsa el botón. Se juega solo el minijuego y al acabar todos vuelven a la sala de espera.
+
+Se puede probar **tú solo** (con 1 jugador): en ese caso termina cuando te caes o a los 60 segundos.
+
+Se puede combinar con el modo sin internet: `?red=local&minijuego=plataforma`.
 
 ### Plan B: probar sin internet en el multijugador
 
@@ -90,6 +115,12 @@ js/reglas/              → reglas del juego (solo las ejecuta el host)
    anfitrion.js         → sala de espera y mensajes del host
    motor.js             → turnos, dado, movimiento, minijuego, final
    casillas.js          → efectos de casillas y eventos al azar
+js/minijuegos/          → minijuegos (ver "Cómo se hace un minijuego nuevo" en docs/DISENO.md)
+   registro.js          → lista de minijuegos (aquí se registra cada uno nuevo)
+   controlador.js       → instrucciones, 3-2-1, partida y resultados
+   tiempo-real/         → base de red en tiempo real (reutilizable)
+   puntuacion/          → base para minijuegos de puntuación
+   plataforma/          → minijuego "Fuera de la plataforma"
 js/tablero/             → el tablero
    datos-tablero.js     → casillas, caminos y bifurcaciones
    escena.js            → dibujo 3D con Three.js y cámara
@@ -99,4 +130,5 @@ js/interfaz/            → pantallas HTML
 docs/DISENO.md          → documento de diseño
 ```
 
-¿Quieres cambiar cuántas monedas da una casilla o cuánto cuesta la estrella? Está todo en `js/reglas/config.js`.
+¿Quieres cambiar cuántas monedas da una casilla, cuánto cuesta la estrella o cuántas monedas da cada puesto de un minijuego? Está todo en `js/reglas/config.js`.
+¿Quieres que el empujón sea más fuerte o que la plataforma encoja más rápido? Mira `AJUSTES` en `js/minijuegos/plataforma/simulacion.js`.

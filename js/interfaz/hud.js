@@ -2,7 +2,7 @@
 //  hud.js — Todo lo que se ve ENCIMA del tablero durante la partida
 // ---------------------------------------------------------------------
 //  Marcador, ronda, dado, botones, preguntas (bifurcación / tienda),
-//  minijuego provisional y resultados. Se redibuja cada vez que llega
+//  y resultados finales. Se redibuja cada vez que llega
 //  un estado nuevo del host.
 // =====================================================================
 
@@ -15,7 +15,8 @@ function ver(id, visible) { $(id).classList.toggle('oculto', !visible); }
 export class Hud {
   /**
    * @param {object} acciones  alTirar, alSaltar, alElegir(opcion),
-   *                           alContinuar, alVolverSala, alSalir
+   *                           alVolverSala, alSalir
+   *  (Los minijuegos tienen su propia pantalla: js/minijuegos/controlador.js)
    */
   constructor(acciones) {
     this.acciones = acciones;
@@ -27,7 +28,6 @@ export class Hud {
 
     $('btn-tirar').addEventListener('click', () => acciones.alTirar());
     $('btn-saltar').addEventListener('click', () => acciones.alSaltar());
-    $('btn-continuar').addEventListener('click', () => acciones.alContinuar());
     $('btn-volver-sala').addEventListener('click', () => acciones.alVolverSala());
     $('btn-salir-final').addEventListener('click', () => acciones.alSalir());
 
@@ -42,8 +42,6 @@ export class Hud {
   teclaEspacio() {
     if (!$('btn-tirar').classList.contains('oculto')) this.acciones.alTirar();
     else if (!$('btn-saltar').classList.contains('oculto')) this.acciones.alSaltar();
-    else if (!$('btn-continuar').classList.contains('oculto') &&
-      !$('capa-minijuego').classList.contains('oculto')) this.acciones.alContinuar();
   }
 
   /** Teclas 1, 2, 3...: elegir una opción de la pregunta. */
@@ -79,7 +77,6 @@ export class Hud {
     this._pintarMarcador(e, miId);
     this._pintarCentro(e, miId, soyHost);
     this._pintarDecision(e, miId);
-    this._pintarMinijuego(e, soyHost);
     this._pintarResultados(e, miId, soyHost);
   }
 
@@ -198,27 +195,6 @@ export class Hud {
     });
   }
 
-  _pintarMinijuego(e, soyHost) {
-    const m = e.fase === 'minijuego' && e.minijuego;
-    ver('capa-minijuego', !!m);
-    if (!m) { this._pararCuenta('minijuego'); return; }
-    this._empezarCuenta('minijuego', m);
-    const lista = $('minijuego-premios');
-    lista.textContent = '';
-    for (const p of m.premios) {
-      const j = e.jugadores[p.id];
-      const li = filaJugador(j.color, j.nombre);
-      const datos = document.createElement('span');
-      datos.className = 'datos';
-      datos.textContent = `+${p.monedas} 🪙`;
-      datos.style.marginLeft = 'auto';
-      datos.style.fontWeight = '700';
-      li.appendChild(datos);
-      lista.appendChild(li);
-    }
-    ver('btn-continuar', soyHost);
-  }
-
   _pintarResultados(e, miId, soyHost) {
     const fin = e.fase === 'fin';
     ver('capa-resultados', fin);
@@ -245,7 +221,7 @@ export class Hud {
   }
 
   // -------------------------------------------------------------------
-  //  Cuentas atrás (bifurcación, tienda, dado, minijuego)
+  //  Cuentas atrás (bifurcación, tienda, dado)
   // -------------------------------------------------------------------
   /** info = { seq, ms }. Empieza a contar al recibirla por primera vez. */
   _empezarCuenta(nombre, info) {
@@ -267,7 +243,5 @@ export class Hud {
     const centro = sDecision !== null ? `⏱️ ${sDecision} s para decidir` : (sDado !== null ? `⏱️ ${sDado} s` : '');
     $('hud-cuenta').textContent = centro;
     $('decision-cuenta').textContent = sDecision !== null ? `⏱️ ${sDecision} s` : '';
-    const sMini = segundos('minijuego');
-    $('minijuego-cuenta').textContent = sMini !== null ? `Se cierra en ${sMini} s` : '';
   }
 }

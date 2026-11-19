@@ -16,6 +16,8 @@ import { $, mostrarPantalla, mostrarAviso, mostrarModal, escribiendo } from './i
 import { Chat } from './interfaz/chat.js';
 import { PantallaSala } from './interfaz/sala.js';
 import { Hud } from './interfaz/hud.js';
+import { ControladorMinijuegos } from './minijuegos/controlador.js';
+import { MINIJUEGOS } from './minijuegos/registro.js';
 
 // Estado de ESTE navegador
 const app = {
@@ -46,9 +48,20 @@ const hud = new Hud({
   alTirar: () => accion('tirarDado'),
   alSaltar: () => accion('saltar'),
   alElegir: (opcion) => accion('elegir', { opcion }),
-  alContinuar: () => accion('continuar'),
   alVolverSala: () => app.red.enviarAlHost({ t: 'volverSala' }),
   alSalir: () => reiniciar(),
+});
+
+const minijuegos = new ControladorMinijuegos({
+  enviarAlHost: (datos) => app.red && app.red.enviarAlHost(datos),
+  alAbrir: () => { if (app.escena) app.escena.pausar(); },
+  alCerrar: () => { if (app.escena) app.escena.reanudar(); },
+});
+
+// Modo prueba: "?minijuego=plataforma" en la dirección (solo para el host)
+const minijuegoDePrueba = MINIJUEGOS[new URLSearchParams(location.search).get('minijuego')] || null;
+$('btn-probar-mj').addEventListener('click', () => {
+  app.red.enviarAlHost({ t: 'probarMinijuego', id: minijuegoDePrueba.id });
 });
 
 /** Cierra la conexión y vuelve a cargar la página (vuelta al inicio limpia). */
@@ -159,13 +172,22 @@ function alMensaje(msg) {
     case 'sala':
       app.enPartida = false;
       app.estado = null;
+      minijuegos.cerrar();
       pantallaSala.mostrar(msg.sala, app.red.miId);
+      // Botón del modo prueba (solo el host y solo con ?minijuego=...)
+      $('btn-probar-mj').classList.toggle('oculto', !(minijuegoDePrueba && app.red.esHost));
+      if (minijuegoDePrueba) $('btn-probar-mj').textContent = `🧪 Probar minijuego: ${minijuegoDePrueba.nombre}`;
       chat.moverA('hueco-chat-sala');
       mostrarPantalla('sala');
       break;
 
     case 'estado':
       alEstado(msg.estado);
+      break;
+
+    case 'rt':
+      // Foto de un minijuego de tiempo real (unas 20 por segundo)
+      minijuegos.alInstantanea(msg.d);
       break;
 
     case 'aviso':
@@ -194,6 +216,12 @@ async function alEstado(estado) {
   // mientras se cargaba el 3D)
   if (app.escena) app.escena.actualizar(app.estado);
   hud.actualizar(app.estado, app.red.miId, app.red.esHost);
+  // Minijuego: se abre, avanza de etapa o se cierra
+  if (app.estado.fase === 'minijuego' && app.estado.minijuego) {
+    minijuegos.actualizar(app.estado, app.red.miId, app.red.esHost);
+  } else {
+    minijuegos.cerrar();
+  }
 }
 
 /** Carga la parte 3D (Three.js) solo cuando hace falta. */
@@ -208,6 +236,7 @@ async function prepararEscena() {
     try {
       const { Escena } = await import('./tablero/escena.js');
       app.escena = new Escena($('escena'));
+      if (minijuegos.abierto) app.escena.pausar(); // por si ya empezó un minijuego
     } catch (err) {
       console.error(err);
       mostrarModal('No se pudo cargar el 3D',
@@ -229,6 +258,11 @@ document.addEventListener('keydown', (ev) => {
     return;
   }
   if (escribiendo()) return;
+  if (minijuegos.abierto) {
+    // En los minijuegos, las teclas las lee el propio minijuego
+    if (ev.code === 'Space') { ev.preventDefault(); minijuegos.teclaEspacio(); }
+    return;
+  }
   if (ev.code === 'Space') {
     ev.preventDefault();
     hud.teclaEspacio();

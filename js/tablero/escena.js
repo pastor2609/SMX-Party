@@ -387,6 +387,16 @@ export class Escena {
     this.rendererEtiquetas.render(this.escena, this.camara);
   }
 
+  /** Deja de dibujar el tablero (mientras hay un minijuego). */
+  pausar() { this.renderer.setAnimationLoop(null); }
+
+  /** Vuelve a dibujar el tablero. */
+  reanudar() {
+    this.reloj.getDelta(); // descartamos el tiempo que estuvo en pausa
+    this.redimensionar();
+    this.renderer.setAnimationLoop(() => this._fotograma());
+  }
+
   redimensionar() {
     const ancho = this.contenedor.clientWidth || window.innerWidth;
     const alto = this.contenedor.clientHeight || window.innerHeight;

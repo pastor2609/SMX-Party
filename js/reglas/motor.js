@@ -11,7 +11,11 @@
 //    'elegir'     -> responde a una pregunta (bifurcación, tienda)
 //                    datos: { opcion }
 //    'saltar'     -> saltar animaciones del turno actual
-//    'continuar'  -> (host) cerrar la pantalla del minijuego
+//    'continuar'  -> (host) cerrar la pantalla de resultados del minijuego
+//    'puntuacion' -> puntos de un minijuego de puntuación { puntos }
+//
+//  Además, durante los minijuegos de tiempo real llegan los controles
+//  de cada jugador por recibirEntrada().
 // =====================================================================
 
 import { CONFIG } from './config.js';
@@ -20,6 +24,9 @@ import {
   azar, elegirAlAzar, cambiarMonedas, jugadoresActivos,
   efectoAzul, efectoRoja, efectoEvento,
 } from './casillas.js';
+import { MINIJUEGOS, elegirMinijuegoAlAzar } from '../minijuegos/registro.js';
+import { SesionTiempoRealHost } from '../minijuegos/tiempo-real/host.js';
+import { SesionPuntuacionHost } from '../minijuegos/puntuacion/host.js';
 
 /** Baraja una lista (orden aleatorio). */
 function barajar(lista) {
@@ -39,11 +46,19 @@ export class MotorPartida {
    *   idHost     -> id del host (puede cerrar el minijuego)
    *   emitir     -> fn(estado): enviar el estado a todos
    *   avisar     -> fn(texto): mostrar un aviso a todos
+   *   emitirTiempoReal -> fn(instantanea): fotos de los minijuegos
+   *                       de tiempo real (20 por segundo)
+   *   minijuegoDePrueba -> (opcional) id de un minijuego para jugar
+   *                        SOLO ese minijuego, sin tablero
    */
-  constructor({ jugadores, rondas, idHost, emitir, avisar }) {
+  constructor({ jugadores, rondas, idHost, emitir, avisar, emitirTiempoReal, minijuegoDePrueba }) {
     this.idHost = idHost;
     this._emitir = emitir;
     this._avisar = avisar;
+    this._emitirTiempoReal = emitirTiempoReal;
+    this.minijuegoDePrueba = minijuegoDePrueba || null;
+    this.sesion = null;         // minijuego en marcha (si lo hay)
+    this._ultimoMinijuego = null;
     this._seq = 0;              // contador para identificar cada pregunta/dado
     this._pendiente = null;     // acción que estamos esperando
     this._despertar = null;     // para cortar una pausa al saltar
@@ -79,7 +94,7 @@ export class MotorPartida {
       decision: null,         // { seq, jugadorId, tipo, texto, opciones, ms }
       casillaEstrella: elegirAlAzar(CANDIDATAS_ESTRELLA),
       rapido: false,          // true si se están saltando las animaciones
-      minijuego: null,        // { seq, premios: [{ id, monedas }], ms }
+      minijuego: null,        // { instancia, id, etapa, seq, ms, participantes, resultados }
       clasificacion: null,    // al final de la partida
       ganadores: null,
       motivoFin: null,
@@ -97,8 +112,16 @@ export class MotorPartida {
     if (this.detenido) return;
 
     if (accion === 'saltar') {
-      // Solo puede saltar el jugador del turno o el host
-      if (idJugador === this.estado.turnoDe || idJugador === this.idHost) this._saltar();
+      // Solo en el tablero, y solo el jugador del turno o el host
+      const enTablero = this.estado.fase === 'turno';
+      if (enTablero && (idJugador === this.estado.turnoDe || idJugador === this.idHost)) this._saltar();
+      return;
+    }
+
+    if (accion === 'puntuacion') {
+      if (this.sesion && this.sesion.recibirPuntuacion) {
+        this.sesion.recibirPuntuacion(idJugador, datos && datos.puntos);
+      }
       return;
     }
 
@@ -106,6 +129,11 @@ export class MotorPartida {
     if (p && p.jugadorId === idJugador && p.accion === accion) {
       p.terminar(datos || {});
     }
+  }
+
+  /** Controles de un jugador durante un minijuego de tiempo real. */
+  recibirEntrada(idJugador, entrada) {
+    if (this.sesion && this.sesion.recibirEntrada) this.sesion.recibirEntrada(idJugador, entrada);
   }
 
   /** Un jugador se ha ido: la partida sigue sin él. */
@@ -116,6 +144,8 @@ export class MotorPartida {
     this._avisar(`🔌 ${j.nombre} se ha desconectado. La partida continúa sin esa ficha.`);
     // Si era su turno, lo terminamos rápido
     if (this.estado.turnoDe === idJugador) this._saltar();
+    // En un minijuego cuenta como eliminado
+    if (this.sesion) this.sesion.jugadorDesconectado(idJugador);
     if (this._pendiente && this._pendiente.jugadorId === idJugador) this._pendiente.terminar(null);
     this._enviar();
   }
@@ -123,6 +153,7 @@ export class MotorPartida {
   /** Para la partida (por ejemplo si el host vuelve a la sala). */
   detener() {
     this.detenido = true;
+    if (this.sesion) this.sesion.cancelar();
     if (this._pendiente) this._pendiente.terminar(null);
     if (this._despertar) this._despertar();
   }
@@ -188,7 +219,8 @@ export class MotorPartida {
   /** ¿Hay que acabar ya? (menos de 2 jugadores conectados) */
   _debeTerminar() {
     if (this.detenido) return true;
-    if (jugadoresActivos(this.estado).length < CONFIG.MIN_JUGADORES) {
+    const minimo = this.minijuegoDePrueba ? 1 : CONFIG.MIN_JUGADORES;
+    if (jugadoresActivos(this.estado).length < minimo) {
       this.estado.motivoFin = 'No quedan jugadores suficientes conectados.';
       return true;
     }
@@ -210,6 +242,15 @@ export class MotorPartida {
 
   async _bucle() {
     const e = this.estado;
+
+    // Modo prueba: solo un minijuego y vuelta a la sala
+    if (this.minijuegoDePrueba) {
+      e.ronda = 1;
+      e.rondasTotales = 1;
+      await this._minijuego(this.minijuegoDePrueba);
+      return;
+    }
+
     const nombres = e.orden.map((id) => e.jugadores[id].nombre).join(', ');
     this._avisar(`🎲 Orden de turnos: ${nombres}`);
 
@@ -221,7 +262,7 @@ export class MotorPartida {
         await this._turno(id);
       }
       if (this._debeTerminar()) return this._terminar();
-      await this._minijuegoProvisional();
+      await this._minijuego();
     }
     this._terminar();
   }
@@ -344,27 +385,82 @@ export class MotorPartida {
     return `🛒 ${j.nombre} sale de la tienda sin comprar nada.`;
   }
 
-  // ----------------- Minijuego provisional (hueco fase 2) -----------------
-  async _minijuegoProvisional() {
+  // ------------------------------ Minijuego ------------------------------
+  /**
+   * Al final de cada ronda: instrucciones -> 3, 2, 1 -> partida ->
+   * resultados (con monedas según el puesto).
+   */
+  async _minijuego(idForzado) {
     const e = this.estado;
+    const def = (idForzado && MINIJUEGOS[idForzado]) || elegirMinijuegoAlAzar(this._ultimoMinijuego);
+    this._ultimoMinijuego = def.id;
+
     e.fase = 'minijuego';
     e.subfase = null;
     e.turnoDe = null;
     e.dado = null;
+    e.decision = null;
     e.rapido = false;
     this.saltando = false;
 
-    const premios = jugadoresActivos(e).map((id) => {
-      const monedas = azar(CONFIG.MINIJUEGO_PREMIO_MIN, CONFIG.MINIJUEGO_PREMIO_MAX);
-      cambiarMonedas(e.jugadores[id], monedas);
-      return { id, monedas };
-    });
-    premios.sort((a, b) => b.monedas - a.monedas);
-    e.minijuego = { seq: ++this._seq, premios, ms: CONFIG.TIEMPO_MINIJUEGO };
+    const participantes = jugadoresActivos(e);
+    const m = {
+      instancia: ++this._seq,    // identifica esta partida de minijuego
+      id: def.id,
+      etapa: 'instrucciones',
+      seq: ++this._seq,          // cambia en cada etapa (para las cuentas atrás)
+      ms: CONFIG.MINIJUEGO_INSTRUCCIONES,
+      participantes,
+      resultados: null,
+    };
+    e.minijuego = m;
+    const etapa = (nombre, ms) => {
+      m.etapa = nombre;
+      m.seq = ++this._seq;
+      m.ms = ms;
+      this._enviar();
+    };
+
     this._enviar();
+    await this.esperar(CONFIG.MINIJUEGO_INSTRUCCIONES);
+    if (this.detenido) return;
+    etapa('cuenta', CONFIG.MINIJUEGO_CUENTA_ATRAS);
+    await this.esperar(CONFIG.MINIJUEGO_CUENTA_ATRAS);
+    if (this.detenido) return;
+    etapa('jugando', def.duracionMaxima * 1000);
+
+    // ¡A jugar! (según el tipo de minijuego)
+    const jugadores = participantes
+      .filter((id) => e.jugadores[id].conectado)
+      .map((id) => ({ id, nombre: e.jugadores[id].nombre, color: e.jugadores[id].color }));
+    if (def.tipo === 'tiempoReal') {
+      this.sesion = new SesionTiempoRealHost({
+        simulacion: def.crearSimulacion(jugadores),
+        enviar: (inst) => { if (!this.detenido) this._emitirTiempoReal(inst); },
+      });
+    } else {
+      this.sesion = new SesionPuntuacionHost({
+        participantes: jugadores.map((j) => j.id),
+        duracionMaxima: def.duracionMaxima,
+      });
+    }
+    const puestos = await this.sesion.ejecutar();
+    this.sesion = null;
+    if (this.detenido) return;
+
+    // Repartir monedas según el puesto
+    m.resultados = puestos
+      .filter((p) => e.jugadores[p.id] && e.jugadores[p.id].conectado)
+      .sort((a, b) => a.puesto - b.puesto)
+      .map((p) => {
+        const monedas = CONFIG.MONEDAS_POR_PUESTO[p.puesto - 1] ?? CONFIG.MONEDAS_RESTO_PUESTOS;
+        cambiarMonedas(e.jugadores[p.id], monedas);
+        return { id: p.id, puesto: p.puesto, monedas };
+      });
+    etapa('resultados', CONFIG.MINIJUEGO_RESULTADOS);
 
     // Se cierra cuando el host pulsa "Continuar" o al acabar el tiempo
-    await this.esperarAccion(this.idHost, 'continuar', CONFIG.TIEMPO_MINIJUEGO);
+    await this.esperarAccion(this.idHost, 'continuar', CONFIG.MINIJUEGO_RESULTADOS);
     e.minijuego = null;
   }
 

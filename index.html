@@ -76,6 +76,7 @@
           <button id="btn-salir-sala" class="boton boton-gris">Salir</button>
           <button id="btn-empezar" class="boton boton-grande">🚀 Empezar</button>
         </div>
+        <button id="btn-probar-mj" class="boton boton-gris oculto" style="margin-top:10px;width:100%"></button>
       </div>
       <div id="hueco-chat-sala" class="hueco-chat"></div>
     </div>
@@ -118,14 +119,40 @@
     <!-- Chat dentro de la partida -->
     <div id="hueco-chat-juego" class="hueco-chat hueco-chat-juego"></div>
 
-    <!-- Minijuego provisional -->
-    <div id="capa-minijuego" class="capa oculto">
-      <div class="tarjeta">
-        <h2>🎮 Aquí irá un minijuego</h2>
-        <p class="nota">(Hueco para la fase 2. De momento se reparten monedas al azar.)</p>
-        <ul id="minijuego-premios" class="lista-jugadores"></ul>
-        <p id="minijuego-cuenta" class="cuenta"></p>
-        <button id="btn-continuar" class="boton boton-grande oculto">Continuar ▶</button>
+    <!-- =================== MINIJUEGOS (tapa el tablero) =================== -->
+    <div id="capa-mj" class="oculto">
+      <div id="escena-mj"></div>
+
+      <!-- Barra superior durante la partida -->
+      <div id="mj-hud" class="hud oculto">
+        <span id="mj-nombre"></span>
+        <span id="mj-tiempo"></span>
+        <span id="mj-texto"></span>
+      </div>
+
+      <!-- Instrucciones -->
+      <div id="mj-instrucciones" class="capa oculto">
+        <div class="tarjeta">
+          <p id="mj-tipo" class="nota"></p>
+          <h2 id="mj-titulo"></h2>
+          <p id="mj-objetivo"></p>
+          <table id="mj-controles" class="tabla-controles"></table>
+          <p id="mj-cuenta-instr" class="cuenta"></p>
+        </div>
+      </div>
+
+      <!-- 3, 2, 1, ¡YA! -->
+      <div id="mj-cuenta" class="mj-cuenta oculto"></div>
+
+      <!-- Resultados del minijuego -->
+      <div id="mj-resultados" class="capa oculto">
+        <div class="tarjeta">
+          <h2>🏁 Resultados</h2>
+          <p id="mj-res-nombre" class="nota"></p>
+          <ol id="mj-res-lista" class="lista-jugadores"></ol>
+          <p id="mj-res-cuenta" class="cuenta"></p>
+          <button id="mj-continuar" class="boton boton-grande oculto">Volver al tablero ▶</button>
+        </div>
       </div>
     </div>
 

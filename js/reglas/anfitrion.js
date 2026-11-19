@@ -12,6 +12,8 @@
 //    { t: 'empezar' }                          (solo el host)
 //    { t: 'accion', accion, datos }            (durante la partida)
 //    { t: 'volverSala' }                       (solo el host, al final)
+//    { t: 'entrada', d }                       (controles en tiempo real)
+//    { t: 'probarMinijuego', id }              (solo el host, modo prueba)
 //
 //  Mensajes que envía (host -> jugadores):
 //    { t: 'bienvenida', tuId }
@@ -19,11 +21,13 @@
 //    { t: 'sala', sala }
 //    { t: 'estado', estado }
 //    { t: 'aviso', texto }
+//    { t: 'rt', d }            (fotos de los minijuegos de tiempo real)
 //    { t: 'chat', nombre, color, texto, sistema }
 // =====================================================================
 
 import { CONFIG, COLORES_JUGADOR } from './config.js';
 import { MotorPartida } from './motor.js';
+import { MINIJUEGOS } from '../minijuegos/registro.js';
 
 /** Limpia un nombre: sin espacios de más y con largo máximo. */
 export function limpiarNombre(texto) {
@@ -66,6 +70,10 @@ export class Anfitrion {
         if (this.motor && this._buscar(de)) this.motor.recibirAccion(de, msg.accion, msg.datos);
         return;
       case 'volverSala': return this._volverSala(de);
+      case 'entrada':
+        if (this.motor && this._buscar(de)) this.motor.recibirEntrada(de, msg.d);
+        return;
+      case 'probarMinijuego': return this._probarMinijuego(de, msg.id);
       default: return;
     }
   }
@@ -120,15 +128,33 @@ export class Anfitrion {
       this.red.enviarA(id, { t: 'aviso', texto: `Hacen falta al menos ${CONFIG.MIN_JUGADORES} jugadores.` });
       return;
     }
+    this._crearMotor(null);
+    this._mensajeSistema(`🚀 ¡Empieza la partida! ${this.sala.rondas} rondas.`);
+  }
+
+  /** Modo prueba: jugar solo un minijuego (vale con 1 jugador). */
+  _probarMinijuego(id, idMinijuego) {
+    if (!this._esHost(id) || this.motor || !MINIJUEGOS[idMinijuego]) return;
+    this._mensajeSistema(`🧪 Modo prueba: ${MINIJUEGOS[idMinijuego].nombre}`);
+    const motor = this._crearMotor(idMinijuego);
+    // Al acabar el minijuego, todos vuelven a la sala
+    motor.terminado.then(() => {
+      if (this.motor === motor) this._volverSala(this.sala.idHost);
+    });
+  }
+
+  _crearMotor(minijuegoDePrueba) {
     this.motor = new MotorPartida({
       jugadores: this.sala.jugadores,
       rondas: this.sala.rondas,
       idHost: this.sala.idHost,
       emitir: (estado) => this.red.enviarATodos({ t: 'estado', estado }),
       avisar: (texto) => this.red.enviarATodos({ t: 'aviso', texto }),
+      emitirTiempoReal: (d) => this.red.enviarATodos({ t: 'rt', d }),
+      minijuegoDePrueba,
     });
-    this._mensajeSistema(`🚀 ¡Empieza la partida! ${this.sala.rondas} rondas.`);
-    this.motor.iniciar();
+    this.motor.terminado = this.motor.iniciar();
+    return this.motor;
   }
 
   _volverSala(id) {

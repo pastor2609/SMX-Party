@@ -26,6 +26,16 @@ Cada vez que unas cambios a `main`, la web se actualiza sola en un par de minuto
 
 > ⚠️ Los cambios tienen que estar en la rama `main` para que se vean en la web. Si están en otra rama, primero crea la Pull Request y únela (merge).
 
+### 🔄 Si después de publicar ves la versión antigua (o "Crear sala" no hace nada)
+
+Es la **caché** del navegador: guarda archivos del juego unos minutos para ir más rápido y a veces mezcla los viejos con los nuevos. El juego ya trae un arreglo (`sw.js`), pero el navegador lo tiene que instalar una primera vez. Si te pasa:
+
+1. Espera a que GitHub termine de publicar (1-2 minutos tras unir la PR; lo ves en la pestaña **Actions** del repositorio, con un ✅ verde en "pages build and deployment").
+2. Abre la página y **recarga una vez** (F5). Si sale un recuadro rojo "El juego no ha podido arrancar", pulsa **Recargar**.
+3. Si aun así no va, prueba en una **ventana de incógnito** (Ctrl+Mayús+N), que no usa la caché, o espera 10 minutos.
+
+A partir de esta versión, cada vez que abras el juego el navegador comprobará si hay archivos nuevos.
+
 ---
 
 ## 🧪 Cómo probar el juego tú solo (con dos pestañas)
@@ -103,6 +113,7 @@ Y abre `http://localhost:8000` en el navegador.
 
 ```
 index.html              → la página (todas las pantallas)
+sw.js                   → evita que el navegador use archivos viejos tras publicar
 css/estilos.css         → colores y aspecto
 js/main.js              → une todas las piezas
 js/red/                 → TODO lo de internet (se puede cambiar a Firebase)

@@ -413,3 +413,24 @@ kbd {
 /* La barra de recarga y el aviso de espectador solo se ven jugando */
 #capa-mj:not([data-etapa="jugando"]) .mj-recarga,
 #capa-mj:not([data-etapa="jugando"]) .mj-espectador { display: none; }
+
+/* Aviso si el juego no consigue arrancar (ver index.html) */
+#aviso-arranque {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  width: 520px;
+  max-width: calc(100% - 32px);
+  background: #fff;
+  border: 3px solid var(--principal);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+#aviso-arranque small { color: var(--gris); word-break: break-word; }

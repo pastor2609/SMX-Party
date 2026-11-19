@@ -112,6 +112,7 @@ Decisiones tomadas en la fase 2:
 ### Arquitectura técnica
 
 - Sin compilación: HTML + CSS + módulos de JavaScript. Three.js y PeerJS desde CDN.
+- `sw.js` (service worker): cada vez que el juego pide un archivo propio, pregunta al servidor si ha cambiado. Evita que, tras publicar, el navegador mezcle archivos nuevos y viejos de su caché (GitHub Pages deja cachear 10 minutos). Si aun así el juego no arranca, `index.html` muestra un aviso con un botón "Recargar".
 - Carpetas:
   - `js/red/` — toda la comunicación. Interfaz común en `red.js`; implementaciones `red-peerjs.js` (online) y `red-local.js` (pestañas del mismo navegador, para pruebas). Para pasar a Firebase basta con crear `red-firebase.js` con los mismos métodos.
   - `js/reglas/` — lógica de la partida (solo la ejecuta el host): sala de espera, turnos, casillas, eventos.

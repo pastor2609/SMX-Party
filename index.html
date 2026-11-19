@@ -6,6 +6,33 @@
   <title>SMX Party</title>
   <link rel="stylesheet" href="css/estilos.css">
 
+  <!-- Arranque seguro (va lo primero):
+       1) Instala sw.js para que el navegador no use archivos viejos de la caché.
+       2) Si el juego no consigue arrancar, muestra un aviso con un botón
+          "Recargar" en vez de quedarse sin hacer nada. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function (e) {
+        console.warn('[sw] No se pudo instalar:', e);
+      });
+    }
+    window.__smxErrores = [];
+    window.addEventListener('error', function (e) { window.__smxErrores.push(e.message); });
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        if (window.__smxArrancado) return; // js/main.js avisa cuando arranca bien
+        var aviso = document.createElement('div');
+        aviso.id = 'aviso-arranque';
+        aviso.innerHTML = '<strong>⚠️ El juego no ha podido arrancar.</strong>' +
+          '<span>Suele pasar justo después de publicar una versión nueva (el navegador tenía archivos viejos guardados).</span>' +
+          '<button class="boton">🔄 Recargar</button><small></small>';
+        aviso.querySelector('small').textContent = window.__smxErrores.join(' · ');
+        aviso.querySelector('button').onclick = function () { location.reload(); };
+        document.body.appendChild(aviso);
+      }, 4000);
+    });
+  </script>
+
   <!-- Three.js (3D) se carga desde CDN. El "importmap" le dice al navegador
        dónde está "three" cuando un archivo hace: import * as THREE from 'three' -->
   <script type="importmap">

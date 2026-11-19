@@ -273,3 +273,7 @@ document.addEventListener('keydown', (ev) => {
 
 // Al cerrar la pestaña, avisamos a los demás
 window.addEventListener('beforeunload', () => { if (app.red) app.red.cerrar(); });
+
+// Todo ha cargado bien: avisamos a index.html para que no muestre el
+// aviso de "El juego no ha podido arrancar".
+window.__smxArrancado = true;
